@@ -10,7 +10,6 @@ import time
 
 suits = ("Spades ♠", "Clubs ♣", "Hearts ♥", "Diamonds ♦")
 ranks = (
-    "1",
     "2",
     "3",
     "4",
@@ -41,10 +40,10 @@ values = {
     "A": 11,
 }
 
-playing = True
+# Single deck blackjack is usually re-shuffled at 50% to 75% of cards used
+cut_percent = 50
 
 # CLASS DEFINTIONS:
-
 
 class Card:
     def __init__(self, suit, rank):
@@ -53,6 +52,9 @@ class Card:
 
     def __str__(self):
         return self.rank + " of " + self.suit
+    
+    def value(self):
+        return values[self.rank]
 
 
 class Deck:
@@ -74,6 +76,9 @@ class Deck:
     def deal(self):
         single_card = self.deck.pop()
         return single_card
+    
+    def size(self):
+        return len(self.deck)
 
 
 class Hand:
@@ -84,7 +89,7 @@ class Hand:
 
     def add_card(self, card):
         self.cards.append(card)
-        self.value += values[card.rank]
+        self.value += card.value()
         if card.rank == "A":
             self.aces += 1  # add to self.aces
 
@@ -92,6 +97,12 @@ class Hand:
         while self.value > 21 and self.aces:
             self.value -= 10
             self.aces -= 1
+
+    def size(self):
+        return len(self.cards)
+    
+    def blackjack(self):
+        return self.size() == 2 and self.value == 21
 
 
 # FUNCTION DEFINITIONS:
@@ -102,9 +113,7 @@ def hit(deck, hand):
     hand.adjust_for_ace()
 
 
-def hit_or_stand(deck, hand):
-    global playing
-
+def hit_or_stand(deck, hand, playing):
     while True:
         x = input("\nWould you like to Hit or Stand? Enter [h/s] ")
 
@@ -118,7 +127,8 @@ def hit_or_stand(deck, hand):
         else:
             print("Sorry, Invalid Input. Please enter [h/s].")
             continue
-        break
+
+        return playing
 
 
 def show_some(player, dealer):
@@ -136,42 +146,33 @@ def show_all(player, dealer):
     print("Dealer's Hand =", dealer.value)
 
 
-def player_busts(player, dealer):
-    print("\n--- Player busts! ---")
-
-
-def player_wins(player, dealer):
-    print("\n--- Player has blackjack! You win! ---")
-
-
-def dealer_busts(player, dealer):
-    print("\n--- Dealer busts! You win! ---")
-
-
-def dealer_wins(player, dealer):
-    print("\n--- Dealer wins! ---")
-
-
-def push(player, dealer):
-    print("\nIts a tie!")
-
-
 # GAMEPLAY!
 
-while True:
-    print("\n----------------------------------------------------------------")
-    print("                ♠♣♥♦ WELCOME TO BLACKJACK! ♠♣♥♦")
-    print("                          Lets Play!")
-    print("----------------------------------------------------------------")
-    print(
-        "Game Rules:  Get as close to 21 as you can without going over!\n\
-        Dealer hits until he/she reaches 17.\n\
-        Aces count as 1 or 11."
-    )
+print("\n----------------------------------------------------------------")
+print("                ♠♣♥♦ WELCOME TO BLACKJACK! ♠♣♥♦")
+print("                          Lets Play!")
+print("----------------------------------------------------------------")
+print(
+    "Game Rules:  Get as close to 21 as you can without going over!\n\
+    Dealer hits until he/she reaches 17.\n\
+    Aces count as 1 or 11."
+)
 
-    # Create & shuffle the deck, deal two cards to each player
-    deck = Deck()
-    deck.shuffle()
+round = 0
+
+# Create & shuffle the deck, deal two cards to each player
+deck = Deck()
+deck.shuffle()
+
+while True:
+
+    round += 1
+
+    print("\n----------------------------------------------------------------")
+    print("                          ★ Round {} ★".format(round))
+    print("----------------------------------------------------------------")
+
+    playing = True
 
     player_hand = Hand()
     player_hand.add_card(deck.deal())
@@ -184,14 +185,21 @@ while True:
     # Show the cards:
     show_some(player_hand, dealer_hand)
 
-    while playing:  # recall this variable from our hit_or_stand function
+    # Check for blackjack
+    if player_hand.value == 21:
+        playing = False
+    elif dealer_hand.value == 21:
+        playing = False
 
+    while playing:
         # Prompt for Player to Hit or Stand
-        hit_or_stand(deck, player_hand)
+        playing = hit_or_stand(deck, player_hand, playing)
         show_some(player_hand, dealer_hand)
 
         if player_hand.value > 21:
-            player_busts(player_hand, dealer_hand)
+            print("\n--- Player busts! ---")
+            break
+        elif player_hand.value == 21:
             break
 
     # If Player hasn't busted, play Dealer's hand
@@ -203,30 +211,42 @@ while True:
         # Show all cards
         time.sleep(1)
         print("\n----------------------------------------------------------------")
-        print("                     ★ Final Results ★")
+        print("                          ★ Results ★")
         print("----------------------------------------------------------------")
 
         show_all(player_hand, dealer_hand)
 
         # Test different winning scenarios
         if dealer_hand.value > 21:
-            dealer_busts(player_hand, dealer_hand)
+            print("\n--- Dealer busts! You win! ---")
 
         elif dealer_hand.value > player_hand.value:
-            dealer_wins(player_hand, dealer_hand)
+            if dealer_hand.blackjack():
+                print("\n--- Blackjack! Dealer wins! ---")
+            else:
+                print("\n--- Dealer wins! ---")
 
         elif dealer_hand.value < player_hand.value:
-            player_wins(player_hand, dealer_hand)
+            if player_hand.blackjack():
+                print("\n--- Blackjack! You win! ---")
+            else:
+                print("\n--- You win! ---")
 
         else:
-            push(player_hand, dealer_hand)
+            print("\nPush. It's a tie!")
+
+    # Re-shuffle if needed
+    if deck.size() * 100 / 52 <= cut_percent:
+        print("\n--- Shuffling the deck ---")
+        deck = Deck()
+        deck.shuffle()
 
     # Ask to play again
     new_game = input("\nPlay another hand? [Y/N] ")
     while new_game.lower() not in ["y", "n"]:
         new_game = input("Invalid Input. Please enter 'y' or 'n' ")
-    if new_game[0].lower() == "y":
-        playing = True
+
+    if True or new_game[0].lower() == "y":
         continue
     else:
         print("\n------------------------Thanks for playing!---------------------\n")
